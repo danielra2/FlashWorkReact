@@ -1,16 +1,15 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
+import { useAuth } from '../context/AuthContext'
 
 function WorkerDashboard() {
   const navigate = useNavigate()
+  const { token, userId, logout } = useAuth()
   const [jobs, setJobs] = useState([])
   const [loading, setLoading] = useState(true)
   const [applyingId, setApplyingId] = useState(null)
   const [message, setMessage] = useState('')
-
-  const token = localStorage.getItem('token')
-  const workerId = localStorage.getItem('userId')
 
   useEffect(() => {
     fetchJobs()
@@ -23,7 +22,7 @@ function WorkerDashboard() {
       })
       const openJobs = response.data.jobList.filter(job => job.status === 'OPEN')
       setJobs(openJobs)
-    } catch (err) {
+    } catch {
       navigate('/login')
     } finally {
       setLoading(false)
@@ -35,12 +34,12 @@ function WorkerDashboard() {
     setMessage('')
     try {
       await axios.post(
-        `http://localhost:8081/api/enrollments/apply/${jobId}/${workerId}`,
+        `http://localhost:8081/api/enrollments/apply/${jobId}/${userId}`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       )
       setMessage('Applied successfully!')
-    } catch (err) {
+    } catch {
       setMessage('Already applied or job no longer available')
     } finally {
       setApplyingId(null)
@@ -48,14 +47,13 @@ function WorkerDashboard() {
   }
 
   function handleLogout() {
-    localStorage.clear()
+    logout()
     navigate('/')
   }
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
 
-      {/* Navbar */}
       <nav className="flex items-center justify-between px-8 py-5 border-b border-gray-800">
         <span className="text-xl font-bold tracking-tight">
           Flash<span className="text-blue-500">Work</span>
@@ -68,7 +66,6 @@ function WorkerDashboard() {
         </button>
       </nav>
 
-      {/* Content */}
       <div className="max-w-4xl mx-auto px-8 py-10">
 
         <h1 className="text-2xl font-bold mb-2">Available Shifts</h1>
