@@ -1,11 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
-import { useAuth } from '../context/AuthContext'
 
 function LoginPage() {
   const navigate = useNavigate()
-  const { login } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -23,14 +21,18 @@ function LoginPage() {
       })
 
       const { token, userType, userId } = response.data
-      login({ token, userType, userId })
+
+      localStorage.setItem('token', token)
+      localStorage.setItem('userType', userType)
+      localStorage.setItem('userId', userId)
 
       if (userType === 'WORKER') {
         navigate('/worker')
       } else {
         navigate('/employer')
       }
-    } catch {
+
+    } catch (err) {
       setError('Invalid email or password')
     } finally {
       setLoading(false)
