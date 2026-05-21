@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
+import { useAuth } from '../context/AuthContext'
 
 function WorkerDashboard() {
   const navigate = useNavigate()
@@ -9,8 +10,8 @@ function WorkerDashboard() {
   const [applyingId, setApplyingId] = useState(null)
   const [message, setMessage] = useState('')
 
-  const token = localStorage.getItem('token')
-  const workerId = localStorage.getItem('userId')
+
+const { token, userId: workerId, logout } = useAuth()
 
   useEffect(() => {
     fetchJobs()
@@ -35,7 +36,7 @@ function WorkerDashboard() {
     setMessage('')
     try {
       await axios.post(
-        `http://localhost:8081/api/enrollments/apply/${jobId}/${workerId}`,
+        `http://localhost:8081/api/enrollments/apply/${jobId}`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       )
@@ -47,10 +48,11 @@ function WorkerDashboard() {
     }
   }
 
-  function handleLogout() {
-    localStorage.clear()
-    navigate('/')
-  }
+
+function handleLogout() {
+  logout()
+  navigate('/')
+}
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">

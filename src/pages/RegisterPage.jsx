@@ -8,12 +8,22 @@ function RegisterPage() {
   const [userType, setUserType] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [companyName, setCompanyName] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
   function handleRoleSelect(role) {
     setUserType(role)
     setStep(2)
+  }
+
+  function handleCredentialsSubmit(e) {
+    e.preventDefault()
+    setError('')
+    setStep(3)
   }
 
   async function handleRegister(e) {
@@ -25,12 +35,13 @@ function RegisterPage() {
       await axios.post('http://localhost:8081/api/users/register', {
         email,
         password,
-        userType
+        userType,
+        firstName: userType === 'WORKER' ? firstName : null,
+        lastName: userType === 'WORKER' ? lastName : null,
+        companyName: userType === 'EMPLOYER' ? companyName : null,
       })
-
       navigate('/login')
-
-    } catch (err) {
+    } catch {
       setError('This email is already in use')
     } finally {
       setLoading(false)
@@ -40,7 +51,6 @@ function RegisterPage() {
   return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col">
 
-      {/* Navbar */}
       <nav className="px-8 py-5">
         <span
           onClick={() => navigate('/')}
@@ -73,9 +83,7 @@ function RegisterPage() {
                   className="w-full p-5 bg-gray-900 hover:bg-gray-800 border border-gray-700 hover:border-blue-500 rounded-xl text-left transition-all"
                 >
                   <p className="font-semibold mb-1">Join as a Worker</p>
-                  <p className="text-gray-400 text-sm">
-                    Find flexible shifts and get hired fast
-                  </p>
+                  <p className="text-gray-400 text-sm">Find flexible shifts and get hired fast</p>
                 </button>
 
                 <button
@@ -83,15 +91,13 @@ function RegisterPage() {
                   className="w-full p-5 bg-gray-900 hover:bg-gray-800 border border-gray-700 hover:border-blue-500 rounded-xl text-left transition-all"
                 >
                   <p className="font-semibold mb-1">Join as an Employer</p>
-                  <p className="text-gray-400 text-sm">
-                    Post shifts and hire workers same day
-                  </p>
+                  <p className="text-gray-400 text-sm">Post shifts and hire workers same day</p>
                 </button>
               </div>
             </div>
           )}
 
-          {/* Pasul 2 — formular */}
+          {/* Pasul 2 — email + parola */}
           {step === 2 && (
             <div>
               <button
@@ -109,10 +115,10 @@ function RegisterPage() {
                 <span className="text-blue-500">
                   {userType === 'WORKER' ? 'Worker' : 'Employer'}
                 </span>{' '}
-                account
+                account — step 1 of 2
               </p>
 
-              <form onSubmit={handleRegister} className="flex flex-col gap-4">
+              <form onSubmit={handleCredentialsSubmit} className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1">
                   <label className="text-sm text-gray-400">Email</label>
                   <input
@@ -134,8 +140,90 @@ function RegisterPage() {
                     placeholder="••••••••"
                     className="bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-sm outline-none focus:border-blue-500 transition-colors"
                     required
+                    minLength={6}
                   />
                 </div>
+
+                <button
+                  type="submit"
+                  className="mt-2 py-3 bg-blue-600 hover:bg-blue-500 rounded-lg font-medium text-sm transition-colors"
+                >
+                  Continue →
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* Pasul 3 — date profil */}
+          {step === 3 && (
+            <div>
+              <button
+                onClick={() => setStep(2)}
+                className="text-gray-400 hover:text-white text-sm mb-6 flex items-center gap-1 transition-colors"
+              >
+                ← Back
+              </button>
+
+              <h1 className="text-2xl font-bold mb-2">
+                {userType === 'WORKER' ? 'Your details' : 'Company details'}
+              </h1>
+              <p className="text-gray-400 text-sm mb-8">
+                Step 2 of 2 — almost done
+              </p>
+
+              <form onSubmit={handleRegister} className="flex flex-col gap-4">
+
+                {userType === 'WORKER' && (
+                  <>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-sm text-gray-400">First Name</label>
+                      <input
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        placeholder="Ion"
+                        className="bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-sm outline-none focus:border-blue-500 transition-colors"
+                        required
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <label className="text-sm text-gray-400">Last Name</label>
+                      <input
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        placeholder="Popescu"
+                        className="bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-sm outline-none focus:border-blue-500 transition-colors"
+                        required
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <label className="text-sm text-gray-400">
+                        Phone{' '}
+                        <span className="text-gray-600">(optional)</span>
+                      </label>
+                      <input
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="07xx xxx xxx"
+                        className="bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-sm outline-none focus:border-blue-500 transition-colors"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {userType === 'EMPLOYER' && (
+                  <div className="flex flex-col gap-1">
+                    <label className="text-sm text-gray-400">Company Name</label>
+                    <input
+                      value={companyName}
+                      onChange={(e) => setCompanyName(e.target.value)}
+                      placeholder="Firma SRL"
+                      className="bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-sm outline-none focus:border-blue-500 transition-colors"
+                      required
+                    />
+                  </div>
+                )}
 
                 {error && (
                   <p className="text-red-400 text-sm">{error}</p>

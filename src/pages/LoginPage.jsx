@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
+import { useAuth } from '../context/AuthContext'
 
 function LoginPage() {
   const navigate = useNavigate()
+  const { login } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -21,10 +23,7 @@ function LoginPage() {
       })
 
       const { token, userType, userId } = response.data
-
-      localStorage.setItem('token', token)
-      localStorage.setItem('userType', userType)
-      localStorage.setItem('userId', userId)
+      login({ token, userType, userId })
 
       if (userType === 'WORKER') {
         navigate('/worker')
@@ -32,7 +31,7 @@ function LoginPage() {
         navigate('/employer')
       }
 
-    } catch (err) {
+    } catch {
       setError('Invalid email or password')
     } finally {
       setLoading(false)
@@ -42,7 +41,6 @@ function LoginPage() {
   return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col">
 
-      {/* Navbar simplu */}
       <nav className="px-8 py-5">
         <span
           onClick={() => navigate('/')}
@@ -52,7 +50,6 @@ function LoginPage() {
         </span>
       </nav>
 
-      {/* Form */}
       <div className="flex-1 flex items-center justify-center px-4">
         <div className="w-full max-w-sm">
 
