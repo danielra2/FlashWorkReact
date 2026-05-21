@@ -312,7 +312,9 @@ function EmployerDashboard() {
                       >
                         <div className="flex flex-col gap-0.5">
                           <span className="text-sm font-medium">
-                            {a.workerFirstName} {a.workerLastName}
+                            {(a.workerFirstName || a.workerLastName)
+                              ? `${a.workerFirstName || ''} ${a.workerLastName || ''}`.trim()
+                              : 'Anonim'}
                           </span>
                           <span className="text-xs text-gray-500">
                             Applied {new Date(a.appliedAt).toLocaleDateString()}

@@ -9,13 +9,25 @@ function WorkerDashboard() {
   const [loading, setLoading] = useState(true)
   const [applyingId, setApplyingId] = useState(null)
   const [message, setMessage] = useState('')
+  const [profile, setProfile] = useState(null)
 
-
-const { token, userId: workerId, logout } = useAuth()
+  const { token, userId: workerId, logout } = useAuth()
 
   useEffect(() => {
     fetchJobs()
+    fetchProfile()
   }, [])
+
+  async function fetchProfile() {
+    try {
+      const res = await axios.get(`http://localhost:8081/api/worker-profiles/user/${workerId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      setProfile(res.data)
+    } catch {
+      // profilul nu a putut fi preluat
+    }
+  }
 
   async function fetchJobs() {
     try {
@@ -48,11 +60,14 @@ const { token, userId: workerId, logout } = useAuth()
     }
   }
 
+  function handleLogout() {
+    logout()
+    navigate('/')
+  }
 
-function handleLogout() {
-  logout()
-  navigate('/')
-}
+  const displayName = profile?.firstName
+    ? `${profile.firstName}${profile.lastName ? ' ' + profile.lastName : ''}`
+    : null
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
@@ -62,12 +77,19 @@ function handleLogout() {
         <span className="text-xl font-bold tracking-tight">
           Flash<span className="text-blue-500">Work</span>
         </span>
-        <button
-          onClick={handleLogout}
-          className="text-sm text-gray-400 hover:text-white transition-colors"
-        >
-          Log out
-        </button>
+        <div className="flex items-center gap-4">
+          {displayName && (
+            <span className="text-sm text-gray-300">
+              Salut, <span className="text-white font-medium">{displayName}</span>
+            </span>
+          )}
+          <button
+            onClick={handleLogout}
+            className="text-sm text-gray-400 hover:text-white transition-colors"
+          >
+            Log out
+          </button>
+        </div>
       </nav>
 
       {/* Content */}
