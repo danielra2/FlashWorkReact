@@ -10,6 +10,21 @@ const STATUS_STYLE = {
   COMPLETED: 'border-blue-800   text-blue-400   bg-blue-950/50',
 }
 
+const ALL_SKILLS = [
+  { value: 'COOKING', label: 'Cooking' },
+  { value: 'DRIVING', label: 'Driving' },
+  { value: 'CLEANING', label: 'Cleaning' },
+  { value: 'BARTENDING', label: 'Bartending' },
+  { value: 'CASHIER', label: 'Cashier' },
+  { value: 'WAREHOUSE', label: 'Warehouse' },
+  { value: 'EVENTS', label: 'Events' },
+  { value: 'CUSTOMER_SERVICE', label: 'Customer Service' },
+  { value: 'CONSTRUCTION', label: 'Construction' },
+  { value: 'IT', label: 'IT' },
+  { value: 'HEALTHCARE', label: 'Healthcare' },
+  { value: 'OTHER', label: 'Other' },
+]
+
 const CATEGORIES = [
   { value: 'RETAIL', label: 'Retail' },
   { value: 'HOSPITALITY', label: 'Hospitality / HoReCa' },
@@ -23,7 +38,6 @@ const CATEGORIES = [
   { value: 'OTHER', label: 'Other' },
 ]
 
-// converts ms difference to "2h 34m" or "45s"
 function formatCountdown(targetISO) {
   const diff = new Date(targetISO) - Date.now()
   if (diff <= 0) return null
@@ -35,7 +49,6 @@ function formatCountdown(targetISO) {
   return `${s}s`
 }
 
-// how long the worker has been clocked in
 function formatDuration(fromISO) {
   const diff = Date.now() - new Date(fromISO)
   const h = Math.floor(diff / 3600000)
@@ -44,14 +57,15 @@ function formatDuration(fromISO) {
   return h > 0 ? `${h}h ${m}m ${s}s` : `${m}m ${s}s`
 }
 
-// formats a datetime to "09:03"
 function formatTime(isoString) {
   return new Date(isoString).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })
 }
 
+const inputCls = 'bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-sm outline-none focus:border-blue-500 transition-colors'
+
 function WorkerDashboard() {
   const navigate = useNavigate()
-  const { token, userId: workerId, logout } = useAuth()
+  const { token, userId, logout } = useAuth()
 
   const [view, setView] = useState('jobs')
   const [jobs, setJobs] = useState([])
@@ -64,21 +78,32 @@ function WorkerDashboard() {
   const [selectedCity, setSelectedCity] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('')
 
-  // tick increments every second — components reading it will re-render with fresh countdown values
+  // profile editing state
+  const [editFirstName, setEditFirstName] = useState('')
+  const [editLastName, setEditLastName] = useState('')
+  const [editPhone, setEditPhone] = useState('')
+  const [editSkills, setEditSkills] = useState([])
+  const [savingProfile, setSavingProfile] = useState(false)
+  const [profileSaveMsg, setProfileSaveMsg] = useState('')
+
   const [tick, setTick] = useState(0)
-  // stores the typed code per enrollment: { 42: "AB3X7K" }
   const [clockCodes, setClockCodes] = useState({})
-  // stores error messages per enrollment: { 42: "Invalid code" }
   const [clockErrors, setClockErrors] = useState({})
   const [clockingIn, setClockingIn] = useState({})
 
-  // start the 1-second ticker once on mount
   useEffect(() => {
     const timer = setInterval(() => setTick(t => t + 1), 1000)
-    return () => clearInterval(timer) // cleanup on unmount
+    return () => clearInterval(timer)
   }, [])
 
-  useEffect(() => { fetchJobs(); fetchProfile() }, [])
+  // re-fetch jobs from server whenever filters change
+  useEffect(() => {
+    fetchJobs(selectedCity, selectedCategory)
+  }, [selectedCity, selectedCategory])
+
+  useEffect(() => {
+    fetchProfile()
+  }, [])
 
   useEffect(() => {
     if (view === 'applications' && profile) {
@@ -86,19 +111,34 @@ function WorkerDashboard() {
     }
   }, [view, profile])
 
+  // populate edit form when profile loads
+  useEffect(() => {
+    if (profile) {
+      setEditFirstName(profile.firstName || '')
+      setEditLastName(profile.lastName || '')
+      setEditPhone(profile.phone || '')
+      setEditSkills(profile.skills || [])
+    }
+  }, [profile])
+
   async function fetchProfile() {
     try {
       const res = await axios.get(
-        `http://localhost:8081/api/worker-profiles/user/${workerId}`,
+        `http://localhost:8081/api/worker-profiles/user/${userId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       )
       setProfile(res.data)
     } catch {}
   }
 
-  async function fetchJobs() {
+  async function fetchJobs(city = '', category = '') {
+    setLoading(true)
     try {
-      const res = await axios.get('http://localhost:8081/api/jobs', {
+      const params = new URLSearchParams()
+      if (category) params.append('category', category)
+      if (city) params.append('location', city)
+      const query = params.toString() ? '?' + params.toString() : ''
+      const res = await axios.get(`http://localhost:8081/api/jobs${query}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       setJobs(res.data.jobList.filter(j => j.status === 'OPEN'))
@@ -149,7 +189,6 @@ function WorkerDashboard() {
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       )
-      // update only this application in the list
       setApplications(prev => prev.map(a => a.id === enrollmentId ? res.data : a))
       setClockCodes(p => ({ ...p, [enrollmentId]: '' }))
     } catch {
@@ -170,19 +209,37 @@ function WorkerDashboard() {
     } catch {}
   }
 
+  async function handleSaveProfile(e) {
+    e.preventDefault()
+    setSavingProfile(true)
+    setProfileSaveMsg('')
+    try {
+      const res = await axios.put(
+        `http://localhost:8081/api/worker-profiles/update/${userId}`,
+        { firstName: editFirstName, lastName: editLastName, phone: editPhone, skills: editSkills },
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      setProfile(res.data)
+      setProfileSaveMsg('Profile updated successfully.')
+    } catch {
+      setProfileSaveMsg('Could not save. Please try again.')
+    } finally {
+      setSavingProfile(false)
+    }
+  }
+
+  function toggleEditSkill(skill) {
+    setEditSkills(prev =>
+      prev.includes(skill) ? prev.filter(s => s !== skill) : [...prev, skill]
+    )
+  }
+
   function handleLogout() { logout(); navigate('/') }
 
   const displayName = profile?.firstName
     ? `${profile.firstName}${profile.lastName ? ' ' + profile.lastName : ''}`
     : null
 
-  const cities = [...new Set(jobs.map(j => j.location).filter(Boolean))].sort()
-  const categoriesInUse = [...new Set(jobs.map(j => j.category).filter(Boolean))].sort()
-  const filteredJobs = jobs.filter(j => {
-    if (selectedCity && j.location !== selectedCity) return false
-    if (selectedCategory && j.category !== selectedCategory) return false
-    return true
-  })
   const categoryLabel = v => CATEGORIES.find(c => c.value === v)?.label || v
 
   return (
@@ -209,22 +266,28 @@ function WorkerDashboard() {
             className={`px-5 py-2 rounded-md text-sm font-medium transition-colors ${view === 'applications' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}>
             My Applications
           </button>
+          <button onClick={() => setView('profile')}
+            className={`px-5 py-2 rounded-md text-sm font-medium transition-colors ${view === 'profile' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}>
+            My Profile
+          </button>
         </div>
 
         {/* Tab: Available Shifts */}
         {view === 'jobs' && (
           <>
             <h1 className="text-2xl font-bold mb-6">Available Shifts</h1>
+
             <div className="flex gap-3 mb-6 flex-wrap">
               <select value={selectedCity} onChange={e => setSelectedCity(e.target.value)}
                 className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-300 outline-none focus:border-blue-500">
                 <option value="">All cities</option>
-                {cities.map(c => <option key={c} value={c}>{c}</option>)}
+                {[...new Set(jobs.map(j => j.location).filter(Boolean))].sort()
+                  .map(c => <option key={c} value={c}>{c}</option>)}
               </select>
               <select value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)}
                 className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-300 outline-none focus:border-blue-500">
                 <option value="">All categories</option>
-                {categoriesInUse.map(c => <option key={c} value={c}>{categoryLabel(c)}</option>)}
+                {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
               </select>
               {(selectedCity || selectedCategory) && (
                 <button onClick={() => { setSelectedCity(''); setSelectedCategory('') }}
@@ -238,10 +301,10 @@ function WorkerDashboard() {
               <div className="mb-6 px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-sm text-blue-400">{message}</div>
             )}
             {loading && <p className="text-gray-400 text-sm">Loading shifts...</p>}
-            {!loading && filteredJobs.length === 0 && <p className="text-gray-400 text-sm">No shifts found.</p>}
+            {!loading && jobs.length === 0 && <p className="text-gray-400 text-sm">No shifts found.</p>}
 
             <div className="flex flex-col gap-4">
-              {filteredJobs.map(job => (
+              {jobs.map(job => (
                 <div key={job.id} className="bg-gray-900 border border-gray-800 rounded-xl p-6 flex items-start justify-between gap-4">
                   <div className="flex flex-col gap-2">
                     <div className="flex items-center gap-3 flex-wrap">
@@ -257,6 +320,7 @@ function WorkerDashboard() {
                       <span>📍 {job.location}</span>
                       <span>💰 ${job.hourlyRate}/hr</span>
                       <span>🕐 {new Date(job.startTime).toLocaleDateString()}</span>
+                      {job.companyName && <span>🏢 {job.companyName}</span>}
                       {job.maxWorkers != null && (
                         <span className={job.maxWorkers - job.acceptedCount <= 2 ? 'text-orange-400' : 'text-gray-500'}>
                           👥 {job.maxWorkers - job.acceptedCount} spot{job.maxWorkers - job.acceptedCount !== 1 ? 's' : ''} left
@@ -282,13 +346,12 @@ function WorkerDashboard() {
             {!loadingApps && applications.length === 0 && (
               <p className="text-gray-400 text-sm">You haven't applied to any shifts yet.</p>
             )}
-
             <div className="flex flex-col gap-4">
               {applications.map(app => {
                 const now = Date.now()
                 const start = new Date(app.jobStartTime).getTime()
                 const end = new Date(app.jobEndTime).getTime()
-                const countdown = formatCountdown(app.jobStartTime) // null when start has passed
+                const countdown = formatCountdown(app.jobStartTime)
                 const isShiftActive = now >= start && now <= end
                 const isBeforeShift = now < start
                 const isClockedIn = !!app.clockInTime && !app.clockOutTime
@@ -296,14 +359,10 @@ function WorkerDashboard() {
 
                 return (
                   <div key={app.id} className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-
-                    {/* Header row */}
                     <div className="p-6 flex items-start justify-between gap-4">
                       <div className="flex flex-col gap-1.5">
                         <h3 className="font-semibold text-lg">{app.jobTitle}</h3>
-                        <span className="text-xs text-gray-500">
-                          Applied {new Date(app.appliedAt).toLocaleDateString()}
-                        </span>
+                        <span className="text-xs text-gray-500">Applied {new Date(app.appliedAt).toLocaleDateString()}</span>
                         {app.jobStartTime && (
                           <span className="text-xs text-gray-500">
                             {new Date(app.jobStartTime).toLocaleDateString()} · {formatTime(app.jobStartTime)} – {formatTime(app.jobEndTime)}
@@ -315,19 +374,14 @@ function WorkerDashboard() {
                       </span>
                     </div>
 
-                    {/* Clock section — only for ACCEPTED applications */}
                     {app.status === 'ACCEPTED' && (
                       <div className="border-t border-gray-800 px-6 py-4 flex flex-col gap-3">
-
-                        {/* BEFORE SHIFT: show countdown */}
                         {isBeforeShift && countdown && (
                           <div className="flex items-center gap-2">
                             <span className="text-xs text-gray-400">Shift starts in</span>
                             <span className="text-sm font-semibold text-blue-400 font-mono">{countdown}</span>
                           </div>
                         )}
-
-                        {/* SHIFT ACTIVE or BEFORE — not yet clocked in: show code input */}
                         {(isShiftActive || isBeforeShift) && !app.clockInTime && (
                           <div className="flex flex-col gap-2">
                             <p className="text-xs text-gray-400">Ask the employer for the clock-in code and enter it below:</p>
@@ -342,18 +396,13 @@ function WorkerDashboard() {
                               <button
                                 onClick={() => handleClockIn(app.id)}
                                 disabled={clockingIn[app.id] || !(clockCodes[app.id] || '').trim()}
-                                className="px-4 py-2 bg-green-700 hover:bg-green-600 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors"
-                              >
+                                className="px-4 py-2 bg-green-700 hover:bg-green-600 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors">
                                 {clockingIn[app.id] ? 'Clocking in...' : 'Clock In'}
                               </button>
                             </div>
-                            {clockErrors[app.id] && (
-                              <p className="text-red-400 text-xs">{clockErrors[app.id]}</p>
-                            )}
+                            {clockErrors[app.id] && <p className="text-red-400 text-xs">{clockErrors[app.id]}</p>}
                           </div>
                         )}
-
-                        {/* CLOCKED IN — show live working time + clock out button */}
                         {isClockedIn && (
                           <div className="flex items-center justify-between">
                             <div className="flex flex-col gap-0.5">
@@ -368,22 +417,72 @@ function WorkerDashboard() {
                             </button>
                           </div>
                         )}
-
-                        {/* DONE — show summary */}
                         {isDone && app.clockInTime && app.clockOutTime && (
                           <div className="flex items-center gap-4 text-sm text-gray-400">
                             <span>Clocked in: <span className="text-white font-mono">{formatTime(app.clockInTime)}</span></span>
                             <span>Clocked out: <span className="text-white font-mono">{formatTime(app.clockOutTime)}</span></span>
                           </div>
                         )}
-
                       </div>
                     )}
-
                   </div>
                 )
               })}
             </div>
+          </>
+        )}
+
+        {/* Tab: My Profile */}
+        {view === 'profile' && (
+          <>
+            <h1 className="text-2xl font-bold mb-6">My Profile</h1>
+            {!profile && <p className="text-gray-400 text-sm">Loading...</p>}
+            {profile && (
+              <form onSubmit={handleSaveProfile} className="flex flex-col gap-5 max-w-md">
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm text-gray-400">First Name</label>
+                  <input value={editFirstName} onChange={e => setEditFirstName(e.target.value)}
+                    className={inputCls} required />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm text-gray-400">Last Name</label>
+                  <input value={editLastName} onChange={e => setEditLastName(e.target.value)}
+                    className={inputCls} required />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm text-gray-400">Phone <span className="text-gray-600">(optional)</span></label>
+                  <input value={editPhone} onChange={e => setEditPhone(e.target.value)}
+                    placeholder="07xx xxx xxx" className={inputCls} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm text-gray-400">Skills</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {ALL_SKILLS.map(s => {
+                      const active = editSkills.includes(s.value)
+                      return (
+                        <button key={s.value} type="button" onClick={() => toggleEditSkill(s.value)}
+                          className={`px-3 py-2.5 rounded-lg text-xs font-medium border transition-all ${
+                            active
+                              ? 'bg-blue-600 border-blue-500 text-white'
+                              : 'bg-gray-900 border-gray-700 text-gray-400 hover:border-gray-500 hover:text-white'
+                          }`}>
+                          {s.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                {profileSaveMsg && (
+                  <p className={`text-sm ${profileSaveMsg.includes('success') ? 'text-green-400' : 'text-red-400'}`}>
+                    {profileSaveMsg}
+                  </p>
+                )}
+                <button type="submit" disabled={savingProfile}
+                  className="py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg font-medium text-sm transition-colors">
+                  {savingProfile ? 'Saving...' : 'Save Changes'}
+                </button>
+              </form>
+            )}
           </>
         )}
 
